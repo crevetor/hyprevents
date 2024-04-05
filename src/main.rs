@@ -19,8 +19,11 @@ struct Args {
     #[arg(value_enum)]
     mode: Mode,
 
-    #[arg(short = 'p', long)]
-    hypr_path: Option<PathBuf>,
+    #[arg(short = 'c', long)]
+    hypr_ctl_path: Option<PathBuf>,
+
+    #[arg(short = 'e', long)]
+    hypr_evt_path: Option<PathBuf>,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -53,8 +56,8 @@ fn ctl_cmd(ctlsocketpath: &PathBuf, cmd: &str) -> Result<()> {
 fn match_cmds(buffer: &str, cmds: &[&str]) -> Result<bool> {
     for line in buffer.lines() {
         if let Some((cmd, _data)) = line.split_once(">>") {
-        if cmds.contains(&cmd) {
-            return Ok(true);
+            if cmds.contains(&cmd) {
+                return Ok(true);
             }
         }
     }
@@ -66,18 +69,18 @@ fn main() -> Result<()> {
     let args = Args::parse();
     let hypr_instance = env::var(HYPR_ENV);
 
-    if hypr_instance.is_err() && args.hypr_path.is_none() {
+    if hypr_instance.is_err() && (args.hypr_ctl_path.is_none() || args.hypr_evt_path.is_none()) {
         panic!("Socket path not specified and {} not set", HYPR_ENV);
     }
 
     let hypr_instance = hypr_instance.unwrap();
 
-    let ctlsocketpath = args.hypr_path.clone().unwrap_or(
+    let ctlsocketpath = args.hypr_ctl_path.clone().unwrap_or(
         ["/", "tmp", "hypr", &hypr_instance, ".socket.sock"]
             .iter()
             .collect(),
     );
-    let eventsocketpath = args.hypr_path.unwrap_or(
+    let eventsocketpath = args.hypr_evt_path.unwrap_or(
         ["/", "tmp", "hypr", &hypr_instance, ".socket2.sock"]
             .iter()
             .collect(),
@@ -95,9 +98,30 @@ fn main() -> Result<()> {
 
     while let Ok(n) = events.read(&mut read_buf[..]) {
         match args.mode {
-            Mode::ActiveWindow if match_cmds(std::str::from_utf8(&read_buf[..n])?, &["activewindow", "windowtitle"])? => ctl_cmd(&ctlsocketpath, ACTIVE_WINDOW_CMD)?,
-            Mode::ActiveWorkspace if match_cmds(std::str::from_utf8(&read_buf[..n])?, &["workspace", "activewindow"])? => ctl_cmd(&ctlsocketpath, ACTIVE_WORKSPACE_CMD)?,
-            Mode::Workspaces if match_cmds(std::str::from_utf8(&read_buf[..n])?, &["createworkspace", "destroyworkspace"])? => ctl_cmd(&ctlsocketpath, WORKSPACES_CMD)?, 
+            Mode::ActiveWindow
+                if match_cmds(
+                    std::str::from_utf8(&read_buf[..n])?,
+                    &["activewindow", "windowtitle"],
+                )? =>
+            {
+                ctl_cmd(&ctlsocketpath, ACTIVE_WINDOW_CMD)?
+            }
+            Mode::ActiveWorkspace
+                if match_cmds(
+                    std::str::from_utf8(&read_buf[..n])?,
+                    &["workspace", "activewindow"],
+                )? =>
+            {
+                ctl_cmd(&ctlsocketpath, ACTIVE_WORKSPACE_CMD)?
+            }
+            Mode::Workspaces
+                if match_cmds(
+                    std::str::from_utf8(&read_buf[..n])?,
+                    &["createworkspace", "destroyworkspace"],
+                )? =>
+            {
+                ctl_cmd(&ctlsocketpath, WORKSPACES_CMD)?
+            }
             _ => (),
         }
     }
