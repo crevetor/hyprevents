@@ -13,15 +13,19 @@ const ACTIVE_WINDOW_CMD: &str = "j/activewindow";
 const ACTIVE_WORKSPACE_CMD: &str = "j/activeworkspace";
 const WORKSPACES_CMD: &str = "j/workspaces";
 
+/// Listen for hyprland events and emit the associated value (as json)
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Which mode should we run this in (what hyprland event are we watching)
     #[arg(value_enum)]
     mode: Mode,
 
+    /// Hyprland control socket path
     #[arg(short = 'c', long)]
     hypr_ctl_path: Option<PathBuf>,
 
+    /// Hyprland events socket path
     #[arg(short = 'e', long)]
     hypr_evt_path: Option<PathBuf>,
 }
