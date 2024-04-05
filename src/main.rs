@@ -52,9 +52,10 @@ fn ctl_cmd(ctlsocketpath: &PathBuf, cmd: &str) -> Result<()> {
 
 fn match_cmds(buffer: &str, cmds: &[&str]) -> Result<bool> {
     for line in buffer.lines() {
-        let (cmd, _data) = line.split_once(">>").unwrap_or(("", ""));
+        if let Some((cmd, _data)) = line.split_once(">>") {
         if cmds.contains(&cmd) {
             return Ok(true);
+            }
         }
     }
 
